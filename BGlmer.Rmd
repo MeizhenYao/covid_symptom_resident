@@ -1,0 +1,717 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+# import packages and dataset
+```{r}
+library(gtsummary)
+library(gt)
+library(tidyverse)
+library(readxl)
+library(boot)
+library(table1)
+library(flextable)
+library(plyr)
+library(Rcpp)
+library(blme)
+library(glmnet)
+
+whole <- read_excel("C:/Users/yaom03/Documents/Projects/Covid19-Medical Student/input/NEW/EHS_unadjusted1.xlsx")
+EHS <- read_excel("C:/Users/yaom03/Documents/Projects/Covid19-Medical Student/input/NEW/EHS_adjusted1.xlsx")
+
+```
+
+
+
+
+# Bayesian: unadjusted
+```{r}
+
+## cough
+bglmer_cough <- bglmer(cs ~ cough + (1|id), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_cough_table<- bglmer_cough %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+
+## chills
+bglmer_chills <- bglmer(cs ~ chills + (1|chills), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+
+bglmer_chills_table<- bglmer_chills %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## fever
+bglmer_fever <- bglmer(cs ~ fever + (1|fever), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior =  gamma(shape=10,rate=20,posterior.scale="sd"), 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+
+bglmer_fever_table<- bglmer_fever %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## fatigue
+bglmer_fatigue <- bglmer(cs ~ fatigue + (1|id), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_fatigue_table<- bglmer_fatigue %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## myalgia
+bglmer_myalgia <- bglmer(cs ~ myalgia + (1|myalgia), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = gamma(shape=2,rate=1,posterior.scale="sd"), 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+
+bglmer_myalgia_table<- bglmer_myalgia %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## ha
+bglmer_ha <- bglmer(cs ~ ha + (1|id), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_ha_table<- bglmer_ha %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## sob
+bglmer_sob <- bglmer(cs ~ sob + (1|sob), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_sob_table<- bglmer_sob %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## pharyngitis
+bglmer_pharyngitis <- bglmer(cs ~ pharyngitis + (1|id), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_pharyngitis_table<- bglmer_pharyngitis %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## diarrhea
+bglmer_diarrhea <- bglmer(cs ~ diarrhea + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_diarrhea_table<- bglmer_diarrhea %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## nv
+bglmer_nv <- bglmer(cs ~ nv + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ =3L, 
+                    verbose = T)
+
+
+bglmer_nv_table<- bglmer_nv %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## loss_smell
+bglmer_loss_smell <- bglmer(cs ~ loss_smell + (1|loss_smell), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 2L, 
+                    verbose = T)
+
+
+(bglmer_loss_smell_table<- bglmer_loss_smell %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels())
+
+
+
+
+## loss_taste
+bglmer_loss_taste <- bglmer(cs ~ loss_taste + (1|loss_taste), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = gamma(shape=10,rate=10,posterior.scale='sd'), 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-1, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+
+(bglmer_loss_taste_table<- bglmer_loss_taste %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels())
+
+## malaise
+bglmer_malaise <- bglmer(cs ~ malaise + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_malaise_table<- bglmer_malaise %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+ 
+## rhinorrhea
+bglmer_rhinorrhea <- bglmer(cs ~ rhinorrhea + (1|rhinorrhea), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = gamma(shape=1,rate=1,posterior.scale='sd'),  
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+bglmer_rhinorrhea_table<- bglmer_rhinorrhea %>%
+  tbl_regression(
+    exponentiate = TRUE, include = everything(),
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+
+## Total unadjusted table
+tbl_stack_unadjusted <- tbl_stack(list(bglmer_cough_table, 
+                                       bglmer_chills_table,
+                                       bglmer_fever_table,
+                                       bglmer_fatigue_table,
+                                       bglmer_myalgia_table,
+                                       bglmer_ha_table,
+                                       bglmer_sob_table,
+                                       bglmer_pharyngitis_table,
+                                       bglmer_diarrhea_table,
+                                       bglmer_nv_table,
+                                       bglmer_loss_smell_table,
+                                       bglmer_loss_taste_table,
+                                       bglmer_malaise_table,
+                                       bglmer_rhinorrhea_table
+                                       ))
+
+
+```
+
+
+# Bayesian: Adjusted
+```{r}
+
+## cough
+bglmer_cough1 <- bglmer(cs ~ cough + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer ="bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+bglmer_cough_table1<- bglmer_cough1 %>%
+  tbl_regression(
+    include="cough",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+# x1=model.matrix(cs~cough + sex + age + race_cat + deploypopchange + medsurg + currprog,whole)[,-1]
+# y=whole$cs
+# lasso_cough<- predict(glmnet(x1,y,alpha=1),type="coefficients",s=0)
+# 
+# 
+# lasso_cough_table1<- lasso_cough %>%
+#   tbl_regression(
+#     include="cough",
+#     exponentiate = TRUE, 
+#     pvalue_fun = function(x) style_pvalue(x, digits = 3),
+#     estimate_fun = function(x) style_ratio(x, digits = 3)
+#   ) %>% 
+#   bold_p(t = 0.1) %>%
+#   bold_labels() %>% 
+#   italicize_levels()
+
+
+
+
+
+
+
+## chills
+bglmer_chills1 <- bglmer(cs ~ chills + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|chills), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-1, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_chills_table1<- bglmer_chills1 %>%
+  tbl_regression(
+    include="chills",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits =3),
+    estimate_fun = function(x) style_ratio(x, digits =3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## fever
+bglmer_fever1 <- bglmer(cs ~ fever + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|fever), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior =   gamma(shape=10,rate=10,posterior.scale="sd"), 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-1, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+
+bglmer_fever_table1<- bglmer_fever1 %>%
+  tbl_regression(
+    include="fever",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## fatigue
+bglmer_fatigue1 <- bglmer(cs ~ fatigue + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ =3L, 
+                    verbose = T)
+
+
+bglmer_fatigue_table1<- bglmer_fatigue1 %>%
+  tbl_regression(
+    include="fatigue",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## myalgia
+bglmer_myalgia1 <- bglmer(cs ~ myalgia + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|myalgia), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior =   gamma(shape=10,rate=10,posterior.scale="sd"),
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_myalgia_table1<- bglmer_myalgia1 %>%
+  tbl_regression(
+    include="myalgia",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## ha
+bglmer_ha1 <- bglmer(cs ~ ha + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_ha_table1<- bglmer_ha1 %>%
+  tbl_regression(
+    include="ha",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## sob
+bglmer_sob1 <- bglmer(cs ~ sob + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_sob_table1<- bglmer_sob1 %>%
+  tbl_regression(
+    include="sob",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## pharyngitis
+bglmer_pharyngitis1 <- bglmer(cs ~ pharyngitis + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_pharyngitis_table1<- bglmer_pharyngitis1 %>%
+  tbl_regression(
+    include="pharyngitis",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## diarrhea
+bglmer_diarrhea1 <- bglmer(cs ~ diarrhea + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 3L, 
+                    verbose = T)
+
+
+bglmer_diarrhea_table1<- bglmer_diarrhea1 %>%
+  tbl_regression(
+    include="diarrhea",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## nv
+bglmer_nv1 <- bglmer(cs ~ nv + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior =    gamma(shape=5,rate=5,posterior.scale="sd"),
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+
+(bglmer_nv_table1<- bglmer_nv1 %>%
+  tbl_regression(
+    include="nv",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels())
+
+## loss_smell
+bglmer_loss_smell1 <- bglmer(cs ~ loss_smell + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|loss_smell), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = "gamma", 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-1, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+
+(bglmer_loss_smell_table1<- bglmer_loss_smell1 %>%
+  tbl_regression(
+    include="loss_smell",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels())
+
+## loss_taste
+bglmer_loss_taste1 <- bglmer(cs ~ loss_taste + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|loss_taste), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior = gamma(shape=2,rate=1,posterior.scale="sd"), 
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-1, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+
+(bglmer_loss_taste_table1<- bglmer_loss_taste1 %>%
+  tbl_regression(
+    include="loss_taste",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels())
+
+## malaise
+bglmer_malaise1 <- bglmer(cs ~ malaise + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|malaise), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior =  gamma(shape=5,rate=5,posterior.scale="sd"),
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-1, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+
+bglmer_malaise_table1<- bglmer_malaise1 %>%
+  tbl_regression(
+    include="malaise",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## rhinorrhea
+bglmer_rhinorrhea1 <- bglmer(cs ~ rhinorrhea + sex + age + race_cat + deploypopchange + medsurg + currprog + (1|sex), 
+                    family = "binomial", 
+                    data = whole , 
+                    cov.prior =  gamma(shape=1/3,rate=3,posterior.scale="sd"),
+                    fixef.prior = "normal", 
+                    control = glmerControl(optimizer = "bobyqa",standardize.X = F,check.conv.grad = .makeCC("warning", tol = 1e-2, relTol = NULL)), 
+                    nAGQ = 1L, 
+                    verbose = T)
+
+
+bglmer_rhinorrhea_table1<- bglmer_rhinorrhea1 %>%
+  tbl_regression(
+    include="rhinorrhea",
+    exponentiate = TRUE, 
+    pvalue_fun = function(x) style_pvalue(x, digits = 3),
+    estimate_fun = function(x) style_ratio(x, digits = 3)
+  ) %>% 
+  bold_p(t = 0.1) %>%
+  bold_labels() %>% 
+  italicize_levels()
+
+## Total adjusted table
+tbl_stack_adjusted <- tbl_stack(list(bglmer_cough_table1, 
+                                       bglmer_chills_table1,
+                                       bglmer_fever_table1,
+                                       bglmer_fatigue_table1,
+                                       bglmer_myalgia_table1,
+                                       bglmer_ha_table1,
+                                       bglmer_sob_table1,
+                                       bglmer_pharyngitis_table1,
+                                       bglmer_diarrhea_table1,
+                                       bglmer_nv_table1,
+                                       bglmer_loss_smell_table1,
+                                       bglmer_loss_taste_table1,
+                                       bglmer_malaise_table1,
+                                       bglmer_rhinorrhea_table1
+                                       ))
+
+
+```
+
+## Merge table
+```{r}
+tbl_bgl_total<- tbl_merge(list(tbl_stack_unadjusted, tbl_stack_adjusted), 
+                          tab_spanner = c("Unadjusted", "Adjusted"))
+tbl_bgl_total
+
+```
+
+
+
+
+
+
+
+

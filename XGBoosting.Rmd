@@ -1,0 +1,730 @@
+
+
+# load required library
+```{r}
+library(randomForest)
+library(MASS)
+library(gbm)
+library(car)
+library(readr)
+library(lattice)
+library(nlme)
+library(ggplot2)
+library(GGally)
+library(nnet)
+library(foreign)
+library(biotools)
+library(glmmML)
+library(MASS)
+library(lme4)
+library(multcomp)
+library(dplyr)
+library(qwraps2)
+library(knitr)
+library(xtable)
+library(kableExtra)
+library(DT)
+library(glmnet)
+library(corrplot)
+library(ggpubr)
+library("EnvStats")
+library(lmerTest)
+library("merTools")
+library(reshape2)
+library(ggplot2)
+library(GGally)
+library(mgcv)
+library(gplots)
+library(tidyr)
+library(cluster)
+library(factoextra)
+library(plotrix)
+library(psych)
+library(caret)
+library(vcd)
+library(SHAPforxgboost)
+library(bkmr)
+library(mi)
+library(stargazer)
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) 
+library(spatstat)
+library(Hmisc)
+library(summarytools)
+library(gtsummary)
+library(DescTools)
+library(blme)
+library("labelled")
+library(matlib)
+library(lavaan)
+library(igraph)
+library(semPlot)
+library(mice)
+# install.packages("drat", repos="https://cran.rstudio.com") #the latest version
+# drat:::addRepo("dmlc")
+# install.packages("xgboost", repos="http://dmlc.ml/drat/", type = "source")
+library(drat)
+library(xgboost)
+```
+
+# EHS DATASET
+## Data imputation: using MICE
+```{r}
+
+library(readxl)
+EHS_adjusted <- read_excel("C:/Users/yaom03/Documents/Projects/covid19-medical student/input/NEW/EHS_adjusted.xlsx")
+
+# convert the variable type in the imputation process
+EHS_adjusted[EHS_adjusted=='NA']<- NA
+EHS_adjusted$Sex<-as.factor(EHS_adjusted$Sex)
+EHS_adjusted$Race<-as.factor(EHS_adjusted$Race)
+EHS_adjusted$TS<-as.factor(EHS_adjusted$TS)
+
+
+# md.pattern(EHS_adjusted)
+sapply(EHS_adjusted, function(x) sum(is.na(x)))  # to check missingness
+
+# Initialize the Imputation
+
+init = mice(EHS_adjusted, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+# Specify variables you don’t want to impute
+
+meth[c("cs","Cough","Chills","Fever","Fatigue","Myalgia","Ha","Sob", "Pharyngitis","Diarrhea", "NV", "LOS","LOT", "Malaise", "Rhinorrhea","Sex","Age","CIUPP","MSunit")] = ""
+
+# Specify a method to be used for imputation for some selected variables 
+##  used Random Forest(rf) for selected variables
+
+meth[c("Race","TS")] = "rf"
+
+
+# Now Run your Main Imputation using “Random Forest”
+## m = 5 creates 5 different datasets 
+
+set.seed(1234)
+imputed1 = mice(EHS_adjusted, method=meth, predictorMatrix=predM, m=5, ntree = 50)
+
+# Use the First completed data set (you can choose any one of the 5 completed Datasets)
+
+final1 <- complete(imputed1, action=2)
+
+
+# Check if you actually imputed all the variables you wanted to impute
+
+sapply(final1, function(x) sum(is.na(x)))
+ 
+```
+
+
+## XGBoosting
+
+### symptoms +other variables
+```{r}
+
+# prepare data
+
+set.seed(76265)
+## seed.number
+selected_rownames <- (sample(rownames(final1),ceiling(dim(final1)*25/100)))
+imputed_xgb_test1 <- final1[rownames(final1) %in% selected_rownames,]
+imputed_xgb_train1 <- final1[!(rownames(final1) %in% selected_rownames),]
+
+## input data
+## transfer categorical variables to dummy variables
+
+set.seed(76265)
+## seed.number
+data.train.X1 = Matrix::sparse.model.matrix(cs~.-1,data=imputed_xgb_train1)
+data.train.Y1 = as.list(imputed_xgb_train1$cs)
+
+
+data.test.X1 = Matrix::sparse.model.matrix(cs~.-1,data=imputed_xgb_test1)
+data.test.Y1 = as.list(imputed_xgb_test1$cs)
+
+dtrain1 = xgb.DMatrix(data=data.train.X1,label=data.train.Y1)
+dtest1 = xgb.DMatrix(data=data.test.X1,label=data.test.Y1)
+
+# 4 Fold Cross Validation
+
+  best_param = list()
+  best_seednumber = 1234
+  
+  best_test_logloss_mean = 0.3
+  
+  test_logloss_mean = 0
+ 
+  
+  for (iter in 1:5000) {
+    
+      param <- list(max_depth = sample(4:6, 1),
+                  nthread = 1, 
+                  eta = sample(c(0.1,0.2),1),
+                  min_child_weight=sample(c(1,2),1),
+                  subsample = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bytree = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bylevel= sample(seq(0.6,0.9,0.1),1), 
+                  colsample_bynode= sample(seq(0.6,0.9,0.1),1)
+)             
+    cv.nround = 50
+    cv.nfold = 4
+    seed.number = runif(1,1,1e8)
+    
+    mdcv <- xgb.cv(dtrain1,
+                   params = param, nfold=cv.nfold, nrounds=cv.nround,  objective = "binary:logistic",metrics="logloss")
+    
+    test_error_mean = (mdcv$evaluation_log[cv.nround, test_logloss_mean])
+    
+    if (test_logloss_mean < best_test_logloss_mean) {
+      
+      best_test_logloss_mean = test_logloss_mean
+      best_seednumber = seed.number
+      best_param = param
+    }
+  }
+  
+  best_test_logloss_mean    
+  
+  # best_param
+  best_seednumber   
+
+set.seed(6352.943)
+# seed.number = best_seednumber 
+
+
+
+
+param <- list(max_depth = sample(4:6, 1),
+                  nthread = 1, 
+                  eta = sample(c(0.1,0.2),1),
+                  min_child_weight=sample(c(1,2),1),
+                  subsample = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bytree = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bylevel= sample(seq(0.6,0.9,0.1),1), 
+                  colsample_bynode= sample(seq(0.6,0.9,0.1),1)
+) 
+
+xgboost_covid_final1 <- xgboost(dtrain1,  nrounds = 50, params = param)
+
+
+phat1 = predict(xgboost_covid_final1,data.test.X1)
+
+confusionMatrix(as.factor(as.numeric(phat1> 0.5)), as.factor(unlist(data.test.Y1)))
+
+### important plot
+
+library(SHAPforxgboost)
+
+
+shap_values_WR_SPV1 <- shap.values(xgb_model = xgboost_covid_final1, X_train = data.train.X1)
+
+shap_table1 <- data.frame(Predictors = names(round((shap_values_WR_SPV1$mean_shap_score/sum(shap_values_WR_SPV1$mean_shap_score))*100,2)),
+                         SHAP_cont = (round((shap_values_WR_SPV1$mean_shap_score/sum(shap_values_WR_SPV1$mean_shap_score))*100,2)),
+                         mean_SHAP_score = shap_values_WR_SPV1$mean_shap_score)
+
+shap_table1$Predictors <- factor(shap_table1$Predictors, levels = rev(names(round((shap_values_WR_SPV1$mean_shap_score/sum(shap_values_WR_SPV1$mean_shap_score))*100,2))))
+
+# colnames(shap_table1) <- c("Predictors","% SHAP Contribution")
+
+p1<-ggplot(data=shap_table1, aes(x=Predictors, y=SHAP_cont)) +
+    geom_bar(stat="identity") + 
+    coord_flip() + 
+    labs(y = "Percentage (SHAP) scores", x = "Predictors") + 
+    theme(axis.text.y = element_text(face="bold",color="#993333",size=7))
+
+p1
+
+```
+
+
+### symptoms
+```{r}
+
+# prepare data
+
+set.seed(76265)
+## seed.number  c("Sex","age","Race","deploypopchange","medsurg","TS"
+selected_rownames <- (sample(rownames(final1),ceiling(dim(final1)*25/100)))
+imputed_xgb_test2 <- final1[rownames(final1) %in% selected_rownames,-(16:21)]
+imputed_xgb_train2 <- final1[!(rownames(final1) %in% selected_rownames),-(16:21)]
+
+## input data
+## transfer categorical variables to dummy variables
+
+set.seed(76265)
+## seed.number
+data.train.X2 = Matrix::sparse.model.matrix(cs~.-1,data=imputed_xgb_train2)
+data.train.Y2 = as.list(imputed_xgb_train2$cs)
+
+
+data.test.X2 = Matrix::sparse.model.matrix(cs~.-1,data=imputed_xgb_test2)
+data.test.Y2 = as.list(imputed_xgb_test2$cs)
+
+dtrain2 = xgb.DMatrix(data=data.train.X2,label=data.train.Y2)
+dtest2 = xgb.DMatrix(data=data.test.X2,label=data.test.Y2)
+
+# 4 Fold Cross Validation
+
+  best_param = list()
+  best_seednumber = 1234
+  
+  best_test_logloss_mean = 0.3
+  
+  test_logloss_mean = 0
+ 
+  
+  for (iter in 1:5000) {
+    
+      param <- list(max_depth = sample(6:8, 1),
+                  nthread = 1, 
+                  eta = sample(c(0.1,0.2),1),
+                  min_child_weight=sample(c(1,2),1),
+                  subsample = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bytree = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bylevel= sample(seq(0.6,0.9,0.1),1), 
+                  colsample_bynode= sample(seq(0.6,0.9,0.1),1)
+)             
+    cv.nround = 50
+    cv.nfold = 4
+    seed.number = runif(1,1,1e7)
+    
+    mdcv <- xgb.cv(dtrain2,
+                   params = param, nfold=cv.nfold, nrounds=cv.nround,  objective = "binary:logistic",metrics="logloss")
+    
+    test_error_mean = (mdcv$evaluation_log[cv.nround, test_logloss_mean])
+    
+    if (test_logloss_mean < best_test_logloss_mean) {
+      
+      best_test_logloss_mean = test_logloss_mean
+      best_seednumber = seed.number
+      best_param = param
+    }
+  }
+  
+  best_test_logloss_mean    
+  # best_param
+  best_seednumber   
+
+set.seed(best_seednumber)
+seed.number = best_seednumber 
+
+
+# set.seed(6352579)
+#seed.number = 6352579
+
+param <- list(max_depth = sample(4:6, 1),
+                  nthread = 1, 
+                  eta = sample(c(0.1,0.2),1),
+                  min_child_weight=sample(c(1,2),1),
+                  subsample = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bytree = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bylevel= sample(seq(0.6,0.9,0.1),1), 
+                  colsample_bynode= sample(seq(0.6,0.9,0.1),1)
+) 
+
+xgboost_covid_final2<- xgboost(dtrain2,  nrounds = 50, params = param)
+
+
+phat2 = predict(xgboost_covid_final2,data.test.X2)
+
+confusionMatrix(as.factor(as.numeric(phat2> 0.5)), as.factor(unlist(data.test.Y2)))
+
+### important plot
+
+library(SHAPforxgboost)
+
+
+shap_values_WR_SPV2 <- shap.values(xgb_model = xgboost_covid_final2, X_train = data.train.X2)
+
+shap_table2 <- data.frame(Predictors = names(round((shap_values_WR_SPV2$mean_shap_score/sum(shap_values_WR_SPV2$mean_shap_score))*100,2)),
+                         SHAP_cont = (round((shap_values_WR_SPV2$mean_shap_score/sum(shap_values_WR_SPV2$mean_shap_score))*100,2)),
+                         mean_SHAP_score = shap_values_WR_SPV2$mean_shap_score)
+
+shap_table2$Predictors <- factor(shap_table2$Predictors, levels = rev(names(round((shap_values_WR_SPV2$mean_shap_score/sum(shap_values_WR_SPV2$mean_shap_score))*100,2))))
+
+# colnames(shap_table) <- c("Predictors","% SHAP Contribution")
+
+p2<-ggplot(data=shap_table2, aes(x=Predictors, y=SHAP_cont)) +
+    geom_bar(stat="identity") + 
+    coord_flip() + 
+    labs(y = "Percentage (SHAP) scores", x = "Predictors") + 
+    theme(axis.text.y = element_text(face="bold",color="#993333",size=9))
+
+p2
+
+
+```
+
+# Whole Data
+## Data imputation: using MICE
+```{r}
+
+library(readxl)
+EHS_unadjusted <- read_excel("C:/Users/yaom03/Documents/Projects/covid19-medical student/input/NEW/EHS_unadjusted.xlsx")
+
+# convert the variable type in the imputation process
+EHS_unadjusted[EHS_unadjusted=='NA']<- NA
+EHS_unadjusted$Sex<-as.factor(EHS_unadjusted$Sex)
+EHS_unadjusted$Race<-as.factor(EHS_unadjusted$Race)
+EHS_unadjusted$TS<-as.factor(EHS_unadjusted$TS)
+
+
+# md.pattern(EHS_adjusted)
+sapply(EHS_unadjusted, function(x) sum(is.na(x)))  # to check missingness
+
+# Initialize the Imputation
+
+init = mice(EHS_unadjusted, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+# Specify variables you don’t want to impute
+
+meth[c("cs","Cough","Chills","Fever","Fatigue","Myalgia","Ha","Sob", "Pharyngitis","Diarrhea", "NV", "LOS","LOT", "Malaise", "Rhinorrhea","Sex","Age","CIUPP","MSunit")] = ""
+
+# Specify a method to be used for imputation for some selected variables 
+##  used Random Forest(rf) for selected variables
+
+meth[c("Race","TS")] = "rf"
+
+
+# Now Run your Main Imputation using “Random Forest”
+## m = 5 creates 5 different datasets 
+
+set.seed(1234)
+imputed2 = mice(EHS_unadjusted, method=meth, predictorMatrix=predM, m=5, ntree = 50)
+
+# Use the First completed data set (you can choose any one of the 5 completed Datasets)
+
+final2 <- complete(imputed2, action=2)
+
+# Check if you actually imputed all the variables you wanted to impute
+
+sapply(final2, function(x) sum(is.na(x)))
+ 
+```
+
+
+## XGBoosting
+
+### symptoms +other variables
+```{r}
+
+# prepare data
+
+set.seed(76265)
+## seed.number
+selected_rownames <- (sample(rownames(final2),ceiling(dim(final2)*25/100)))
+imputed_xgb_test3 <- final2[rownames(final2) %in% selected_rownames,]
+imputed_xgb_train3 <- final2[!(rownames(final2) %in% selected_rownames),]
+
+## input data
+## transfer categorical variables to dummy variables
+
+set.seed(76265)
+## seed.number
+data.train.X3 = Matrix::sparse.model.matrix(cs~.-1,data=imputed_xgb_train3)
+data.train.Y3 = as.list(imputed_xgb_train3$cs)
+
+
+data.test.X3 = Matrix::sparse.model.matrix(cs~.-1,data=imputed_xgb_test3)
+data.test.Y3 = as.list(imputed_xgb_test3$cs)
+
+dtrain3 = xgb.DMatrix(data=data.train.X3,label=data.train.Y3)
+dtest3 = xgb.DMatrix(data=data.test.X3,label=data.test.Y3)
+
+# 4 Fold Cross Validation: choose best seed number
+
+  best_param = list()
+  best_seednumber = 1234
+  
+  best_test_logloss_mean = 0.3
+  
+  test_logloss_mean = 0
+ 
+  
+  for (iter in 1:5000) {
+    
+      param <- list(max_depth = sample(4:6, 1),
+                  nthread = 1, 
+                  eta = sample(c(0.1,0.2),1),
+                  min_child_weight=sample(c(1,2),1),
+                  subsample = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bytree = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bylevel= sample(seq(0.6,0.9,0.1),1), 
+                  colsample_bynode= sample(seq(0.6,0.9,0.1),1)
+)             
+    cv.nround = 50
+    cv.nfold = 4
+    seed.number = runif(1,1,1e6)
+    
+    mdcv <- xgb.cv(dtrain3,
+                   params = param, nfold=cv.nfold, nrounds=cv.nround,  objective = "binary:logistic",metrics="logloss")
+    
+    test_error_mean = (mdcv$evaluation_log[cv.nround, test_logloss_mean])
+    
+    if (test_logloss_mean < best_test_logloss_mean) {
+      
+      best_test_logloss_mean = test_logloss_mean
+      best_seednumber = seed.number
+      best_param = param
+    }
+  }
+  
+  best_test_logloss_mean    
+  # best_param
+  best_seednumber   
+
+set.seed(best_seednumber)
+seed.number = best_seednumber 
+
+
+set.seed(635258.2)
+
+
+param <- list(max_depth = sample(4:6, 1),
+                  nthread = 1, 
+                  eta = sample(c(0.1,0.2),1),
+                  min_child_weight=sample(c(1,2),1),
+                  subsample = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bytree = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bylevel= sample(seq(0.6,0.9,0.1),1), 
+                  colsample_bynode= sample(seq(0.6,0.9,0.1),1)
+) 
+
+xgboost_covid_final3 <- xgboost(dtrain3,  nrounds = 50, params = param)
+
+
+phat3 = predict(xgboost_covid_final3,data.test.X3)
+
+confusionMatrix(as.factor(as.numeric(phat3> 0.5)), as.factor(unlist(data.test.Y3)))
+
+### important plot
+
+library(SHAPforxgboost)
+
+
+shap_values_WR_SPV3 <- shap.values(xgb_model = xgboost_covid_final3, X_train = data.train.X3)
+
+shap_table3 <- data.frame(Predictors = names(round((shap_values_WR_SPV3$mean_shap_score/sum(shap_values_WR_SPV3$mean_shap_score))*100,2)),
+                         SHAP_cont = (round((shap_values_WR_SPV3$mean_shap_score/sum(shap_values_WR_SPV3$mean_shap_score))*100,2)),
+                         mean_SHAP_score = shap_values_WR_SPV3$mean_shap_score)
+
+shap_table3$Predictors <- factor(shap_table3$Predictors, levels = rev(names(round((shap_values_WR_SPV3$mean_shap_score/sum(shap_values_WR_SPV3$mean_shap_score))*100,2))))
+
+# colnames(shap_table3) <- c("Predictors","% SHAP Contribution")
+
+supplementary_plot1<-ggplot(data=shap_table3, aes(x=Predictors, y=SHAP_cont)) +
+    geom_bar(stat="identity") + 
+    coord_flip() + 
+    labs(y = "Percentage (SHAP) scores", x = "Predictors") + 
+    theme(axis.text.y = element_text(face="bold",color="#993333",size=11))
+
+supplementary_plot1
+
+
+```
+
+
+### symptoms
+```{r}
+
+# prepare data
+
+set.seed(76265)
+## seed.number  c("Sex","age","Race","deploypopchange","medsurg","TS"
+selected_rownames <- (sample(rownames(final2),ceiling(dim(final2)*25/100)))
+imputed_xgb_test4 <- final2[rownames(final2) %in% selected_rownames,-(16:21)]
+imputed_xgb_train4 <- final2[!(rownames(final2) %in% selected_rownames),-(16:21)]
+
+## input data
+## transfer categorical variables to dummy variables
+
+set.seed(76265)
+## seed.number
+data.train.X4 = Matrix::sparse.model.matrix(cs~.-1,data=imputed_xgb_train4)
+data.train.Y4 = as.list(imputed_xgb_train4$cs)
+
+
+data.test.X4 = Matrix::sparse.model.matrix(cs~.-1,data=imputed_xgb_test4)
+data.test.Y4 = as.list(imputed_xgb_test4$cs)
+
+dtrain4 = xgb.DMatrix(data=data.train.X4,label=data.train.Y4)
+dtest4 = xgb.DMatrix(data=data.test.X4,label=data.test.Y4)
+
+# 4 Fold Cross Validation
+
+  best_param = list()
+  best_seednumber = 129856
+  
+  best_test_logloss_mean = 0.3
+  
+  test_logloss_mean = 0
+ 
+  
+  for (iter in 1:5000) {
+    
+      param <- list(max_depth = sample(4:6, 1),
+                  nthread = 1, 
+                  eta = sample(c(0.1,0.2),1),
+                  min_child_weight=sample(c(1,2),1),
+                  subsample = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bytree = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bylevel= sample(seq(0.6,0.9,0.1),1), 
+                  colsample_bynode= sample(seq(0.6,0.9,0.1),1)
+)             
+    cv.nround = 50
+    cv.nfold = 4
+    seed.number = runif(1,1,1e8)
+    
+    mdcv <- xgb.cv(dtrain4,
+                   params = param, nfold=cv.nfold, nrounds=cv.nround,  objective = "binary:logistic")
+    
+    test_error_mean = (mdcv$evaluation_log[cv.nround, test_logloss_mean])
+    
+    if (test_logloss_mean < best_test_logloss_mean) {
+      
+      best_test_logloss_mean = test_logloss_mean
+      best_seednumber = seed.number
+      best_param = param
+    }
+  }
+  
+  best_test_logloss_mean    
+  # best_param
+  best_seednumber   
+
+set.seed(best_seednumber)
+seed.number = best_seednumber 
+
+
+set.seed(63525785)
+#seed.number = 63525785
+
+param <- list(max_depth = sample(4:6, 1),
+                  nthread = 1, 
+                  eta = sample(c(0.1,0.2),1),
+                  min_child_weight=sample(c(1,2),1),
+                  subsample = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bytree = sample(seq(0.6,0.9,0.1),1),
+                  colsample_bylevel= sample(seq(0.6,0.9,0.1),1), 
+                  colsample_bynode= sample(seq(0.6,0.9,0.1),1)
+) 
+
+xgboost_covid_final4<- xgboost(dtrain4,  nrounds = 50, params = param)
+
+
+phat4 = predict(xgboost_covid_final4,data.test.X4)
+
+confusionMatrix(as.factor(as.numeric(phat4> 0.5)), as.factor(unlist(data.test.Y4)))
+
+### important plot
+
+library(SHAPforxgboost)
+
+
+shap_values_WR_SPV4 <- shap.values(xgb_model = xgboost_covid_final4, X_train = data.train.X4)
+
+shap_table4 <- data.frame(Predictors = names(round((shap_values_WR_SPV4$mean_shap_score/sum(shap_values_WR_SPV4$mean_shap_score))*100,2)),
+                         SHAP_cont = (round((shap_values_WR_SPV4$mean_shap_score/sum(shap_values_WR_SPV4$mean_shap_score))*100,2)),
+                         mean_SHAP_score = shap_values_WR_SPV4$mean_shap_score)
+
+shap_table4$Predictors <- factor(shap_table4$Predictors, levels = rev(names(round((shap_values_WR_SPV4$mean_shap_score/sum(shap_values_WR_SPV4$mean_shap_score))*100,2))))
+
+# colnames(shap_table4) <- c("Predictors","% SHAP Contribution")
+
+figure3<-ggplot(data=shap_table4, aes(x=Predictors, y=SHAP_cont)) +
+    geom_bar(stat="identity") + 
+    coord_flip() + labs(y = "Percentage (SHAP) scores", x = "Predictors")+ 
+    theme(axis.text.y = element_text(face="bold",color="#993333",size=11))
+
+figure3
+
+
+```
+
+## generate plots
+```{r}
+
+supplementary_plot2<- ggarrange(p2,p1,
+                               ncol=2,nrow=1,
+                               labels=c("(A)","(B)"),
+                               font.label = list(size = 14, color = "red", face = "bold", family = NULL)) 
+supplementary_plot2
+```
+
+
+## ROC
+```{r}
+library(pROC)
+
+# EHS dataset
+rocobj1 <- pROC::roc(as.numeric(imputed_xgb_test1$cs), as.numeric(phat1> 0.5))
+rocobj2 <- pROC::roc(imputed_xgb_test2$cs, as.numeric(phat2> 0.5))
+
+
+roclist1 <- list("EHS full model" = rocobj1,
+                "EHS only symptoms" = rocobj2)
+
+rocehs <- (ggroc(roclist1, size = 2) +
+          labs(y = "Sensitivity", x = "1- Specificity") + 
+          scale_colour_manual(values = c("red", "blue")) +  
+          geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), color="grey", size = 2, linetype="dashed") + 
+          theme_bw() )
+
+rocehs <- (rocehs  + theme(legend.position = c(0.7,0.2),
+                     legend.box.background = element_rect(color="black", size=2),
+                     legend.key = element_rect(fill = "white", colour = "black"),
+                     axis.ticks.x= element_blank(),
+                     axis.text.x= element_blank(),
+                     axis.text.y = element_text(face = "bold"),
+                     axis.title=element_text(size=12,face="bold")) 
+        + labs(color='Prediction Model') + annotate(geom = "text", x=0.2, y=0.5, label="AUC:0.8777", color = "red",size = 5)
+        + annotate(geom = "text", x=0.2, y=0.45, label="AUC:0.8626", color = "blue", size = 5))
+        # + annotate(geom = "text", x=0.2, y=0.40, label="AUC:0.64", color = "black", size = 5))
+
+rocehs
+
+# Whole dataset
+rocobj3 <- pROC::roc(as.numeric(imputed_xgb_test3$cs), as.numeric(phat3> 0.5))
+rocobj4 <- pROC::roc(imputed_xgb_test4$cs, as.numeric(phat4> 0.5))
+
+
+roclist2 <- list("Whole full model" = rocobj3,
+                 "Whole only symptoms" = rocobj4)
+
+rocwhole <- (ggroc(roclist2, size = 2) +
+             labs(y = "Sensitivity", x = "1- Specificity") + 
+             scale_colour_manual(values = c("red", "blue")) +  
+             geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), color="grey", size = 2, linetype="dashed") + 
+             theme_bw() )
+
+rocwhole <- (rocwhole  + theme(legend.position = c(0.7,0.2),
+                           legend.box.background = element_rect(color="black", size=2),
+                           legend.key = element_rect(fill = "white", colour = "black"),
+                           axis.ticks.x= element_blank(),
+                           axis.text.x= element_blank(),
+                           axis.text.y = element_text(face = "bold"),
+                           axis.title=element_text(size=12,face="bold")) 
+           + labs(color='Prediction Model') + annotate(geom = "text", x=0.2, y=0.5, label="AUC:0.8377", color = "red",size = 5)
+           + annotate(geom = "text", x=0.2, y=0.45, label="AUC:0.822", color = "blue", size = 5))
+# + annotate(geom = "text", x=0.2, y=0.40, label="AUC:0.64", color = "black", size = 5))
+
+rocwhole
+
+
+# hclust(,method="Ward")
+
+supplementary_plot3<- ggarrange(rocwhole,rocehs,
+                                labels=c("(A)","(B)"),
+                                font.label = list(size = 14, color = "red", face = "bold", family = NULL))
+supplementary_plot3
+
+
+```
+
+
+
+
